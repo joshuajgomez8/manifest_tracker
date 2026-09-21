@@ -9,18 +9,22 @@ NC='\033[0m' # No Color
 ERROR="${ORANGE}E:${NC}"
 
 help="\nUsage:
-manifest_tracker.sh <gerrit username> --uxc[--dhu|--ihu42] <app name> <manifest revision>
+manifest_tracker.sh <gerrit username> --uxc[--dhu|--ihu42] <app name> <manifest revision> [revision to check]
 
-eg: manifest_tracker.sh username --uxc QuickControls fed4fee564ef311501e849a5790ce2966c336165
+eg: manifest_tracker.sh username --uxc QuickControls fed4fee564ef311501e849a5790ce2966c336165 
 
 This tool will help find last 5 commits of an app repo available in a manifest revision.
 Works with projects having source code in$BOLD https://artinfo-gerrit.volvocars.biz/plugins/gitiles/vendor/volvocars/vehiclefunctions/apps/$NC
-and prebuilts in$BOLD https://artinfo-gerrit.volvocars.biz/plugins/gitiles/vendor/volvocars/prebuilts/$NC"
+and prebuilts in$BOLD https://artinfo-gerrit.volvocars.biz/plugins/gitiles/vendor/volvocars/prebuilts/$NC
+
+If you pass a [revision to check] of apps repo, tool can check if that revision is available in this version of apps repo
+"
 
 gerrit_username=$1
 platform=$2
 app_name=$3
 manifest_revision=$4
+revision_to_check=$5
 no_of_commits_to_display=5
 
 [ -z "$gerrit_username" ] && { echo -e "$help" >&2; exit 1; }
@@ -91,6 +95,14 @@ checkout_apps() {
 	cd "$app_name".git || exit
 	echo -e "$GREEN""Last $no_of_commits_to_display commits in apps/$app_name:$NC"
 	git log --oneline -$no_of_commits_to_display "$app_version"
+
+	if [ -n "$revision_to_check" ]; then
+    	if (git merge-base --is-ancestor $revision_to_check $app_version); then
+    		echo -e "${GREEN}Yes$NC$BOLD apps/$app_name$NC [$revision_to_check] is available in$BOLD $manifest_name$NC [$manifest_revision]" 
+		else
+    		echo -e "${ORANGE}No$NC$BOLD apps/$app_name$NC [$revision_to_check] is not available in$BOLD $manifest_name$NC [$manifest_revision]"
+		fi
+	fi
 }
 
 checkout_manifest
