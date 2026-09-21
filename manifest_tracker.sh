@@ -47,31 +47,14 @@ rm -rf $working_folder
 mkdir $working_folder
 cd $working_folder || exit
 
-print_status() {
-    	local pid=$!
-    	local text=$1
-    	local spinner="/-\\|"
-    	local i=0
-    	while kill -0 $pid 2>/dev/null; do
-        	i=$(( (i+1) % 4 ))
-        	printf "\r$text ${spinner:$i:1}"
-        	sleep 0.1
-    	done
-    	printf "\r$text  \n"
-}
-
 checkout_manifest() {
-	[ -z "$manifest_revision" ] && { echo Error in checkout_manifest: Missing manifest_revision >&2; exit 1; }
-
   	echo -e "Cloning$BOLD $manifest_name $NC"
   	GIT_TERMINAL_PROMPT=0 git clone -q --depth 1 "https://$gerrit_username@artinfo-gerrit.volvocars.biz/a/$manifest_name"
   	[ $? -ne 0 ]  && exit 1;
 
 	cd $manifest_name || exit
-	(git fetch -q --depth 1 origin "$manifest_revision") &
-	print_status "Checking out$BOLD $manifest_name $NC$manifest_revision"
-
-	git checkout -q "$manifest_revision"
+	echo -e "Checking out$BOLD $manifest_name $NC$manifest_revision"
+	git fetch -q --depth 1 origin "$manifest_revision" > /dev/null 2>&1 && git checkout -q "$manifest_revision"
 	[ $? -ne 0 ]  && { echo -e "$ERROR" Cannot find revision "$manifest_revision" in "$manifest_name" >&2; exit 1; }
 
 	prebuilt_apk_revision=$(grep -w ''$app_name'' $manifest_sub_file | sed -n 's/.*revision="\([^"]*\)".*/\1/p')
@@ -79,14 +62,12 @@ checkout_manifest() {
 }
 
 checkout_prebuilt() {
-	[ -z "$prebuilt_apk_revision" ] && { echo Error in checkout_prebuilt: Missing prebuilt_apk_revision >&2; exit 1; }
+	echo -e "Cloning$BOLD prebuilts/$app_name $NC"
+	git clone -q --bare --filter=blob:none --depth 1 "https://$gerrit_username@artinfo-gerrit.volvocars.biz/a/vendor/volvocars/prebuilts/$app_name"
 
-	(git clone -q --depth 1 "https://$gerrit_username@artinfo-gerrit.volvocars.biz/a/vendor/volvocars/prebuilts/$app_name") &
-	print_status "Cloning$BOLD prebuilts/$app_name $NC"
-
-	cd "$app_name" || exit
-	(git fetch -q --depth 1 origin "$prebuilt_apk_revision") &
-	print_status "Checking out$BOLD prebuilts/$app_name $NC$prebuilt_apk_revision"
+	cd "$app_name".git || exit
+	echo -e "Checking out$BOLD prebuilts/$app_name $NC$prebuilt_apk_revision"
+	git fetch -q --depth 1 origin "$prebuilt_apk_revision"
 	[ $? -ne 0 ]  && exit 1;
 
 	commit_message=$(git show -s --format=%B "$prebuilt_apk_revision")
@@ -104,22 +85,17 @@ checkout_prebuilt() {
 }
 
 checkout_apps() {
-	[ -z "$app_version" ] && { echo Error in checkout_apps: Missing app_version >&2; exit 1; }
+	echo -e "Cloning$BOLD apps/$app_name $NC"
+	git clone -q --bare --filter=blob:none "https://$gerrit_username@artinfo-gerrit.volvocars.biz/a/vendor/volvocars/vehiclefunctions/apps/$app_name"
 
-	(git clone -q "https://$gerrit_username@artinfo-gerrit.volvocars.biz/a/vendor/volvocars/vehiclefunctions/apps/$app_name") &
-	print_status "Cloning$BOLD apps/$app_name $NC"
-
-	cd "$app_name" || exit
-	(git checkout -q "$app_version") &
-	print_status "Checking out$BOLD apps/$app_name $NC$app_version"
+	cd "$app_name".git || exit
+	echo -e "$GREEN""Last $no_of_commits_to_display commits in apps/$app_name:$NC"
+	git log --oneline -$no_of_commits_to_display "$app_version"
 }
 
 checkout_manifest
 checkout_prebuilt
 checkout_apps
-
-echo -e "$GREEN""Last $no_of_commits_to_display commits in apps/$app_name:$NC"
-git log --oneline -$no_of_commits_to_display
 
 cd /tmp || exit
 rm -rf $working_folder
